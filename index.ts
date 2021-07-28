@@ -1,54 +1,65 @@
 // Build a Mortgage Claculator using Rxjs and calculateMortgage method
 import {calculateMortgage} from './calculate';
 import {fromEvent} from 'rxjs';
-import {map} from 'rxjs/operators';
+import {map, debounceTime} from 'rxjs/operators';
+
+type stringOrNumber = string | number;
+
+function attemptCalculation(loanInterest: number, loanAmount: number, loanLength: number): stringOrNumber {
+  const someParameterIsNegative: boolean = loanInterest < 0 || loanAmount < 0 || loanLength < 0;
+  if (!(loanInterest && loanAmount && loanLength)) {
+    return `Please, specify all parameters`;
+  } else if (someParameterIsNegative) {
+    return `Parameters must be positive`;
+  }
+  return calculateMortgage(loanInterest, loanAmount, loanLength);
+}
 
 const $loanAmountInputEl = document.getElementById('loanAmount');
 const $loanInterestInputEl = document.getElementById('loanInterest');
 const $loanLengthSelectEl = document.getElementById('loanLength');
+const $resultDivEl = document.getElementById('result');
 
-// console.log($loanAmountInputEl);
+let lA: number = 0;
+let lI: number = 0;
+let lL: number = +$loanLengthSelectEl.value;
+const timePeriod = 150;
 
-// $loanAmountInputEl.addEventListener('input', (e) => {
-//   console.group('Hello');
-//   console.log(e.target.value);
-//   console.groupEnd();
-// });
+// observing loan amount change
+const loanAmountSource = fromEvent($loanAmountInputEl, 'input');
+const loanAmountStream$ = loanAmountSource.pipe(
+  debounceTime(timePeriod),
+  map(event => {
+    lA = +event.target.value;
+    return attemptCalculation(lI, lA, lL);
+  })
+);
+const loanAmountSub$ = loanAmountStream$.subscribe(val => {
+  $resultDivEl.innerText = val as string;
+});
 
-const loanAmounStream$ = fromEvent($loanAmountInputEl, 'input');
+// observing interest rate change
+const loanInterestSource = fromEvent($loanInterestInputEl, 'input');
+const loanInterestStream$ = loanInterestSource.pipe(
+  debounceTime(timePeriod),
+  map(event => {
+    lI = +event.target.value;
+    return attemptCalculation(lI, lA, lL);
+  })
+);
+const loanInterestSub$ = loanInterestStream$.subscribe(val => {
+  $resultDivEl.innerText = val as string;
+});
 
-// $loanAmountInputEl.addEventListener('input', (e) => {
-//   console.dir(e.target);
-// });
-
-const loanAmountSub = loanAmounStream$
-.subscribe((e) => console.log(e));
-
-
-// grab button reference
-// const button = document.getElementById('myButton');
-
-// button.addEventListener('click', (e) => {
-//   console.log(e.target);
-// });
-
-// // create an observable of button clicks
-// const myObservable = fromEvent(button, 'click');
-
-// // for now, let's just log the event on each click
-// const subscription = myObservable.subscribe(event => console.log(event));
-
-/*
-const observable1 = interval(400);
-const observable2 = interval(300);
- 
-const subscription = observable1.subscribe(x => console.log('first: ' + x));
-const childSubscription = observable2.subscribe(x => console.log('second: ' + x));
- 
-subscription.add(childSubscription);
- 
-setTimeout(() => {
-  // Unsubscribes BOTH subscription and childSubscription
-  subscription.unsubscribe();
-}, 1000);
-*/
+// observing loan length modification
+const loanLengthSource = fromEvent($loanLengthSelectEl, 'change');
+const loanLengthStream$ = loanLengthSource.pipe(
+  debounceTime(timePeriod),
+  map(event => {
+    lL = +event.target.value;
+    return attemptCalculation(lI, lA, lL);
+  })
+);
+const loanLengthSub$ = loanLengthStream$.subscribe(val => {
+  $resultDivEl.innerText = val as string;
+});
